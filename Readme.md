@@ -1,4 +1,4 @@
-# MLOps Data science knowledge
+# [ods.ai] MLOps Data science knowledge [RUS, 2024]
 
 https://mlops.ml-devs.com/
 
