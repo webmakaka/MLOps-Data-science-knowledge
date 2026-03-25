@@ -1,0 +1,16 @@
+task_config = {
+    "raw_file": "dags/data/raw/train",
+    "clean_text_file": "dags/data/interim/clean_text",
+    "lemmatized_file": "dags/data/interim/lemmatized_file",
+    "train_path": "dags/data/interim/train_samples",
+    "test_path": "dags/data/interim/test_samples",
+    "vectorizer_path": "dags/data/prepared/vectorizer",
+    "lr_model_path": "dags/data/prepared/tf_idf_log_reg",
+    "conf_matrix_path": "dags/data/prepared/tf_idf_conf_matrix",
+    "report_file_path": "dags/data/prepared/tf_idf_report",
+    "random_state": 42,
+    "max_features": 10000,
+    "analyzer": "word",
+    "multi_class": "multinomial",
+    "solver": "saga",
+}
