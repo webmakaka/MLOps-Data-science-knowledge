@@ -11,7 +11,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-nltk = "^3.8.1"
+nltk = "^3.9.4"
 polars = "^0.20.21"
 click = "^8.1.7"
 scikit-learn = "^1.4.2"
