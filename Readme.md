@@ -11,4 +11,4 @@ https://rutube.ru/plst/570319/
 
 <br/>
 
-<a href="https://k8s.ru/">Предложить инженеру работу / подработку на проекте с kubernetes, microservices, machine learning, big data, golang</a>
+<a href="https://mlops.ru/">Предложить инженеру работу / подработку на проекте с kubernetes, microservices, machine learning, big data, golang</a>
