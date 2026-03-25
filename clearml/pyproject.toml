@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "test_mlops"
+version = "0.1.1"
+description = ""
+authors = ["levkovalenko <levozavr@mail.ru>"]
+readme = "README.md"
+packages = [
+    { include = "test_mlops" },
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+nltk = "^3.8.1"
+polars = "^0.20.21"
+click = "^8.1.7"
+scikit-learn = "^1.4.2"
+matplotlib = "^3.8.4"
+clearml = "^1.15.1"
+joblib = "^1.4.0"
+torch = "^2.3.0"
+transformers = "^4.40.1"
+jupyter = "^1.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
