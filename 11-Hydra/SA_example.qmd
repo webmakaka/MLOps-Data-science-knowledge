@@ -1,0 +1,252 @@
+
+```{python}
+import transformers
+from pathlib import Path
+import datasets
+import polars as pl
+from functools import partial
+from sklearn.model_selection import train_test_split
+from datasets import load_dataset, Dataset
+from sklearn.metrics import (
+    f1_score,
+    roc_auc_score,
+    accuracy_score,
+    multilabel_confusion_matrix,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+    classification_report,
+    precision_score,
+    recall_score,
+)
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+    TrainingArguments,
+    Trainer,
+    EvalPrediction,
+    EarlyStoppingCallback,
+)
+from src.config import compose_config
+from typing import Any
+from hydra.utils import instantiate
+import numpy as np
+```
+
+```{python}
+main_conf = compose_config(overrides=["model='roberta'", "training='roberta'", "preprocessing='roberta'"])
+prepr_conf = main_conf["preprocessing"]
+train_conf = main_conf["training"]
+model_conf = main_conf["model"]
+```
+
+
+```{python}
+frame = pl.read_csv("data/train.csv", has_header=False, new_columns=["polarity", "title", "text"])
+```
+
+
+```{python}
+def preprocess_frame(frame: pl.DataFrame):
+    res = frame.with_columns(
+        [
+        ((pl.col("title") + " " + pl.col("text")).alias("text")),
+        (pl.col("polarity").replace({1: 0, 2: 1}))
+        ]
+    )
+    return res
+```
+
+```{python}
+def preprocess_sample(
+    sample: dict[str, Any], tokenizer: AutoTokenizer
+) -> dict[str, Any]:
+    """Encode input raw string to sequence of tokens.
+    Also add corresponding labels.
+
+    Args:
+        sample (dict[str, Any]): dataset sample w/ <text-label> pair
+        tokenizer (AutoTokenizer): model tokenizer
+
+    Returns:
+        dict[str, Any]: transformed sample with tokenized text and labels.
+    """
+    text = sample["text"]
+    # каждый сэмпл паддится до самой длинной посл-ти в этом батче (padding="max_length")
+    # макс. длина посл-ти 512 (max_length=512), все, что длиннее, обрезается (truncation=True)
+    encoding = tokenizer(
+        text,
+        padding=prepr_conf["padding"],
+        truncation=True,
+        max_length=prepr_conf["max_length"],
+    )
+    encoding["labels"] = sample["labels"]
+    return encoding
+```
+
+
+```{python}
+def compute_metrics(p: EvalPrediction) -> dict[str, float]:
+    """Calculate metrics used on validation step.
+
+    Args:
+        p (EvalPrediction): container with predictions and
+        ground-truth labels
+
+    Returns:
+        dict[str, float]: dictionary with computed labels
+    """
+    preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+    preds = np.argmax(preds, axis=1)
+    f1 = f1_score(p.label_ids, preds, average="macro")
+    acc = accuracy_score(p.label_ids, preds)
+    res = {"f1": f1, "accuracy": acc}
+    return res
+```
+
+
+```{python}
+def make_dataset(
+    frame: pl.DataFrame,
+    tokenizer: AutoTokenizer,
+    label2id: dict[str, int],
+    train_size: int = None,
+    test_size: int = None,
+) -> tuple[Dataset, Dataset]:
+    """Create huggingface datasets used in training process.
+
+    Args:
+        frame (pl.DataFrame): input frame with text data
+        tokenizer (AutoTokenizer): model tokenizer
+        label2id (dict[str, int]): mapping from category text names
+        to digital ids.
+        test_size (float, optional): test split share. Defaults to None.
+
+    Returns:
+        tuple[Dataset, Dataset]: train & test splits, tokenized, vectorized and batched.
+    """
+    # переименуем столбцы для целостности с api hf-datasets
+    clear_frame = frame.select(
+        pl.col("text"), pl.col("polarity").alias("labels")
+    )
+
+    # перейдем от строковых названий к численным меткам
+    clear_frame = clear_frame.with_columns(pl.col("labels").map_dict(label2id))
+
+    # каррированная функция с фиксированным токенизатором для дальнейшего исп-я в Dataset.map()
+    part_prepr = partial(preprocess_sample, tokenizer=tokenizer)
+
+    train_df, test_df = train_test_split(
+        clear_frame,
+        test_size=test_size,
+        train_size=train_size,
+        random_state=42,
+        stratify=clear_frame["labels"],
+    )
+    train_dataset = Dataset.from_pandas(train_df.to_pandas(), split="train")
+    test_dataset = Dataset.from_pandas(test_df.to_pandas(), split="test")
+    encoded_train = train_dataset.map(
+        part_prepr, batched=True, remove_columns=train_dataset.column_names
+    )
+    encoded_test = test_dataset.map(
+        part_prepr, batched=True, remove_columns=test_dataset.column_names
+    )
+    encoded_train.set_format("torch")
+    encoded_test.set_format("torch")
+    return encoded_train, encoded_test
+```
+
+```{python}
+def make_training_pipeline(
+    exp_name: str,
+    tokenizer: AutoTokenizer,
+    train_dataset: Dataset,
+    eval_dataset: Dataset,
+    batch_size: int = 32,
+    lr: float = 2e-5,
+    epochs_num: int = 20,
+) -> Trainer:
+    """Training process wrapper.
+
+    Args:
+        exp_name (str): name of the local folder
+        for saving model checkpoints.
+        tokenizer (AutoTokenizer): model tokenizer
+        train_dataset (Dataset): train dataset split
+        eval_dataset (Dataset): test dataset split
+        batch_size (int, optional): number of samples
+        in sigle batch. Defaults to 32.
+        lr (float, optional): model's learning rate. Defaults to 2e-5.
+        epochs_num (int, optional):
+        number of training iterations. Defaults to 20.
+
+    Returns:
+        Trainer: hf training pipeline abstraction class.
+    """
+    # args = TrainingArguments(
+    #     exp_name,
+    #     evaluation_strategy="epoch",
+    #     save_strategy="epoch",
+    #     learning_rate=lr,
+    #     per_device_train_batch_size=batch_size,
+    #     per_device_eval_batch_size=batch_size,
+    #     num_train_epochs=epochs_num,
+    #     weight_decay=0.01,
+    #     load_best_model_at_end=True,
+    #     metric_for_best_model="f1",
+    #     fp16=True,
+    # )
+
+    args = instantiate(train_conf)
+
+    # model = AutoModelForSequenceClassification.from_pretrained(
+    #     "cointegrated/rubert-tiny2",
+    #     problem_type="single_label_classification",
+    #     num_labels=len(id2label),
+    #     id2label=id2label,
+    #     label2id=label2id,
+    # )
+
+    model = instantiate(
+        model_conf, num_labels=len(id2label), id2label=id2label, label2id=label2id
+    )
+
+    trainer = Trainer(
+        model,
+        args,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
+    )
+    return trainer
+```
+
+
+### Обучение
+
+```{python}
+processed = preprocess_frame(frame)
+print(processed["polarity"].value_counts(sort=True))
+tokenizer = AutoTokenizer.from_pretrained(prepr_conf["tokenizer_name"])
+label2id = processed["polarity"].unique().sort().to_list()
+label2id = dict(zip(label2id, range(len(label2id))))
+id2label = {v: k for k, v in label2id.items()}
+```
+
+```{python}
+train_ds, test_ds = make_dataset(processed, tokenizer, label2id, main_conf["train_size"], main_conf["test_size"])
+```
+
+
+```{python}
+trainer = make_training_pipeline(
+    "roberta",
+    tokenizer,
+    train_ds,
+    test_ds,
+    train_conf["per_device_train_batch_size"],
+    epochs_num=train_conf["num_train_epochs"],
+)
+trainer.train()
+```

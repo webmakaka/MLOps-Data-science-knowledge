@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "mlops-example"
+version = "0.1.0"
+description = ""
+authors = ["Lev Kovalenko <levozavr@mail.ru>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+dvc = "^3.50.0"
+dvc-gdrive = "^3.0.1"
+click = "^8.1.7"
+nltk = "^3.8.1"
+polars = "^0.20.21"
+scikit-learn = "^1.4.2"
+matplotlib = "^3.8.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

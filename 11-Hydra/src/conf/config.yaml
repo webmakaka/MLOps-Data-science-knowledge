@@ -1,0 +1,11 @@
+defaults:
+  - _self_
+  - preprocessing: distillbert
+  - training: distillbert
+  - model: distillbert
+  - secrets: hf
+
+preprocessing:
+  test_size: 10000
+  train_size: 50000
+  max_length: 512

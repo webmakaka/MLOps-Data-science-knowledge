@@ -1,0 +1,55 @@
+stages:
+  preprocessing:
+    cmd: python mlops_example cli-preprocessing data/train.csv data/processed/train.parquet
+    deps:
+    - data/train.csv
+    - mlops_example/preprocessing.py
+    outs:
+    - data/processed/train.parquet
+  vectorize:
+    cmd: python mlops_example cli-train-vectorizer data/processed/train.parquet models/vecrorizer.pickle data/features/train.parquet data/features/test.parquet
+    params:
+    - vectorizer_tfidf
+    - random_state
+    - test_train_split
+    deps:
+    - data/processed/train.parquet
+    - mlops_example/vectorize.py
+    outs:
+    - models/vecrorizer.pickle
+    - data/features/train.parquet
+    - data/features/test.parquet
+  apply_vectorizer:
+    foreach:
+    - train
+    - test
+    do:
+      cmd: python mlops_example  cli-apply-vectorizer data/features/${item}.parquet models/vecrorizer.pickle data/prepared/${item}_features.npz data/prepared/${item}_target.npy
+      deps:
+      - data/features/${item}.parquet
+      - models/vecrorizer.pickle
+      - mlops_example/vectorize.py
+      outs:
+      - data/prepared/${item}_features.npz
+      - data/prepared/${item}_target.npy
+  model_train:
+    cmd: python mlops_example cli-train data/prepared/train_features.npz data/prepared/train_target.npy models/model.pickle
+    params:
+    - logitic_regression
+    deps:
+      - data/prepared/train_target.npy
+      - data/prepared/train_features.npz
+      - mlops_example/models.py
+    outs:
+    - models/model.pickle
+  model_test:
+    cmd: python mlops_example cli-test data/prepared/test_features.npz data/prepared/test_target.npy models/model.pickle summary.json conflusion_matrix.png
+    deps:
+      - data/prepared/test_target.npy
+      - data/prepared/test_features.npz
+      - mlops_example/models.py
+      - models/model.pickle
+    metrics:
+    - summary.json
+    plots:
+    - conflusion_matrix.png

@@ -1,0 +1,10 @@
+vectorizer_tfidf:
+  max_features: 10000
+  analyzer: "word"
+
+logitic_regression:
+  multi_class: "multinomial"
+  random_state: 41
+
+random_state: 42
+test_train_split: 0.3

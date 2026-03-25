@@ -1,0 +1,5 @@
+padding: max_length
+max_length: 256
+tokenizer_name: siebert/sentiment-roberta-large-english
+test_size: 5000
+train_size: 20000

@@ -1,0 +1,3 @@
+padding: max_length
+max_length: 512
+tokenizer_name: lxyuan/distilbert-base-multilingual-cased-sentiments-student

@@ -1,0 +1,13 @@
+.vscode
+.DS_Store
+*.DS_Store
+
+.idea
+.env
+
+Pipfile.lock
+*~
+*.log
+
+__pycache__
+__pycache__/

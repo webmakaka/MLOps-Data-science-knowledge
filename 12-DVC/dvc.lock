@@ -1,0 +1,180 @@
+schema: '2.0'
+stages:
+  preprocessing:
+    cmd: python mlops_example cli-preprocessing data/train.csv data/processed/train.parquet
+    deps:
+    - path: data/train.csv
+      hash: md5
+      md5: 520937107c39a2d1d1f66cd410e9ed9e
+      size: 1585200224
+    - path: mlops_example/preprocessing.py
+      hash: md5
+      md5: 5b974485ea4eeef7e2aaa4f4643cf54f
+      size: 1892
+    outs:
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: 0ea7e7caab601c0f4dae8df1d857dba7
+      size: 15299789
+  vectorize:
+    cmd: python mlops_example cli-train-vectorizer data/processed/train.parquet models/vecrorizer.pickle
+      data/features/train.parquet data/features/test.parquet
+    deps:
+    - path: data/processed/train.parquet
+      hash: md5
+      md5: 0ea7e7caab601c0f4dae8df1d857dba7
+      size: 15299789
+    - path: mlops_example/vectorize.py
+      hash: md5
+      md5: 329b1e82164841ff34c2456cd511e2ac
+      size: 2108
+    params:
+      params.yaml:
+        random_state: 42
+        test_train_split: 0.3
+        vectorizer_tfidf:
+          max_features: 10000
+          analyzer: word
+    outs:
+    - path: data/features/test.parquet
+      hash: md5
+      md5: 4c62e669fe0d95bd6a4321797ad614f4
+      size: 4736975
+    - path: data/features/train.parquet
+      hash: md5
+      md5: d397460d33ffd6b4b1a1257abb29fe16
+      size: 11078564
+    - path: models/vecrorizer.pickle
+      hash: md5
+      md5: 7113149795fc282d52bb79d2756af53e
+      size: 1292549
+  apply_vectorizer:
+    cmd: python mlops_example  cli-apply-vectorizer data/features/train.parquet models/vecrorizer.pickle
+      data/prepared/train_features.npz data/prepared/train_target.npy
+    deps:
+    - path: data/features/train.parquet
+      hash: md5
+      md5: d397460d33ffd6b4b1a1257abb29fe16
+      size: 11078564
+    - path: mlops_example/vectorize.py
+      hash: md5
+      md5: 329b1e82164841ff34c2456cd511e2ac
+      size: 2108
+    - path: models/vecrorizer.pickle
+      hash: md5
+      md5: 6964ad06350e9c3bf7fc1460c736bc39
+      size: 1292549
+    outs:
+    - path: data/prepared/train_features.npz
+      hash: md5
+      md5: d790a798f9dd402ba8e90369ae5d6cb8
+      size: 9833801
+    - path: data/prepared/train_target.npy
+      hash: md5
+      md5: bde885dc46d3599be1ef22972ab13d76
+      size: 280128
+  apply_vectorizer@train:
+    cmd: python mlops_example  cli-apply-vectorizer data/features/train.parquet models/vecrorizer.pickle
+      data/prepared/train_features.npz data/prepared/train_target.npy
+    deps:
+    - path: data/features/train.parquet
+      hash: md5
+      md5: d397460d33ffd6b4b1a1257abb29fe16
+      size: 11078564
+    - path: mlops_example/vectorize.py
+      hash: md5
+      md5: 329b1e82164841ff34c2456cd511e2ac
+      size: 2108
+    - path: models/vecrorizer.pickle
+      hash: md5
+      md5: 7113149795fc282d52bb79d2756af53e
+      size: 1292549
+    outs:
+    - path: data/prepared/train_features.npz
+      hash: md5
+      md5: d790a798f9dd402ba8e90369ae5d6cb8
+      size: 9833801
+    - path: data/prepared/train_target.npy
+      hash: md5
+      md5: bde885dc46d3599be1ef22972ab13d76
+      size: 280128
+  apply_vectorizer@test:
+    cmd: python mlops_example  cli-apply-vectorizer data/features/test.parquet models/vecrorizer.pickle
+      data/prepared/test_features.npz data/prepared/test_target.npy
+    deps:
+    - path: data/features/test.parquet
+      hash: md5
+      md5: 4c62e669fe0d95bd6a4321797ad614f4
+      size: 4736975
+    - path: mlops_example/vectorize.py
+      hash: md5
+      md5: 329b1e82164841ff34c2456cd511e2ac
+      size: 2108
+    - path: models/vecrorizer.pickle
+      hash: md5
+      md5: 7113149795fc282d52bb79d2756af53e
+      size: 1292549
+    outs:
+    - path: data/prepared/test_features.npz
+      hash: md5
+      md5: 58e57155824a710ad934236755bf00f6
+      size: 4172512
+    - path: data/prepared/test_target.npy
+      hash: md5
+      md5: 9d82a601e3b13d323f43a922411484a0
+      size: 120128
+  model_train:
+    cmd: python mlops_example cli-train data/prepared/train_features.npz data/prepared/train_target.npy
+      models/model.pickle
+    deps:
+    - path: data/prepared/train_features.npz
+      hash: md5
+      md5: d790a798f9dd402ba8e90369ae5d6cb8
+      size: 9833801
+    - path: data/prepared/train_target.npy
+      hash: md5
+      md5: bde885dc46d3599be1ef22972ab13d76
+      size: 280128
+    - path: mlops_example/models.py
+      hash: md5
+      md5: 1aecec56f01fccac98ab454734b81b96
+      size: 2270
+    params:
+      params.yaml:
+        logitic_regression:
+          multi_class: multinomial
+          random_state: 41
+    outs:
+    - path: models/model.pickle
+      hash: md5
+      md5: 91ab801f775943b9b8a3ad96bea9bc2d
+      size: 80730
+  model_test:
+    cmd: python mlops_example cli-test data/prepared/test_features.npz data/prepared/test_target.npy
+      models/model.pickle summary.json conflusion_matrix.png
+    deps:
+    - path: data/prepared/test_features.npz
+      hash: md5
+      md5: 58e57155824a710ad934236755bf00f6
+      size: 4172512
+    - path: data/prepared/test_target.npy
+      hash: md5
+      md5: 9d82a601e3b13d323f43a922411484a0
+      size: 120128
+    - path: mlops_example/models.py
+      hash: md5
+      md5: 1aecec56f01fccac98ab454734b81b96
+      size: 2270
+    - path: models/model.pickle
+      hash: md5
+      md5: 91ab801f775943b9b8a3ad96bea9bc2d
+      size: 80730
+    outs:
+    - path: conflusion_matrix.png
+      hash: md5
+      md5: 455411e9eab2190b6491596219badb89
+      size: 12982
+    - path: summary.json
+      hash: md5
+      md5: 592a0d36f509434e28086e500f44616b
+      size: 513
